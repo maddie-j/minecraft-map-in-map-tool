@@ -7,8 +7,8 @@ from collections.abc import Sequence
 
 ## Constants
 MOVE_DISTANCE = 30
-MOVE_VARIANCE = 10
-MOVE_STEP = 10
+MOVE_VARIANCE = 5
+MOVE_STEP = 5
 
 OVERWORLD_REGION = "\\region"
 POI_REGION = "\\poi"
@@ -98,14 +98,11 @@ class World:
         self.region_list = new_region_list
 
     def choose_new_location(self, world_list) :
-        collision = True ## Just needed to start the loop (why no do-while in python?!)
-        while (collision):
-            collision = False
+        while True:
+            ## Each subsequent world is a random spot farther out
+            base_distance = MOVE_DISTANCE + (len(world_list) * MOVE_STEP)
 
-            ## Each subsequent world is farther out
-            distance = MOVE_DISTANCE + (len(world_list) - 1) * MOVE_STEP
-
-            distance = random.randint(MOVE_DISTANCE - MOVE_VARIANCE, MOVE_DISTANCE + MOVE_VARIANCE)
+            distance = random.randint(base_distance - MOVE_VARIANCE, base_distance + MOVE_VARIANCE)
             direction = random.uniform(0, 2 * math.pi) ## radians
 
             ## I found a use for trig in the real world! My maths teachers should be proud
@@ -115,29 +112,12 @@ class World:
             print(new_origin)
 
             ## TODO: Redo collision checking
+            region_set = set(self.region_list)
+            world_set = world_list.get_region_set()
 
-            # ## Check wether any of the edges of the new world are within the bounds of an existing world
-            # for world in world_list:
-            #     ## Check if x direction overlap
-            #     if  ( ## It overlaps in the x direction and in the z direction
-            #             world["region_bounds"]["min_x"] <= new_region_bounds["min_x"] <= world["region_bounds"]["max_x"] \
-            #             or \
-            #             world["region_bounds"]["min_x"] <= new_region_bounds["max_x"] <= world["region_bounds"]["max_x"] \
-            #         ) \
-            #         and \
-            #         ( \
-            #             world["region_bounds"]["min_z"] <= new_region_bounds["min_z"] <= world["region_bounds"]["max_z"] \
-            #             or \
-            #             world["region_bounds"]["min_z"] <= new_region_bounds["max_z"] <= world["region_bounds"]["max_z"] \
-            #         ) :
-            #         collision = True
-            #         break
-            #     else :
-            #         ## Miss in at least one direction so world ok
-            #         continue
+            if len(world_set.intersection(region_set)) == 0:
+                break
         
-        self.move_origin(new_origin)
-
 
     def print_world(self, world_id) : ## TODO
         ## The +1 is because the region bounds are inclusive bounds
@@ -242,12 +222,12 @@ Final Map
         ## TODO: Move region files
         pass
 
-    # move_region_files(
-    #     new_origin, 
-    #     region_files, 
-    #     path + OVERWORLD_REGION, 
-    #     DEST_SAVE + OVERWORLD_REGION
-    # )
+        # move_region_files(
+        #     new_origin, 
+        #     region_files, 
+        #     path + OVERWORLD_REGION, 
+        #     DEST_SAVE + OVERWORLD_REGION
+        # )
 
 
 def get_world_from_user(world_id) -> World :
