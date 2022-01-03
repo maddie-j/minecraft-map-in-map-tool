@@ -3,6 +3,7 @@ import random
 import math
 import shutil
 import re
+from collections.abc import Sequence
 
 ## Constants
 MOVE_DISTANCE = 30
@@ -41,7 +42,7 @@ class WorldBoundary:
 
 class World:
     def __init__(self, path) :
-        self.path: str                     = path
+        self.path: str                     = path.strip()
         self.region_files                  = self._get_region_files(self.path)
         self.original_region_list          = self._region_files_to_list(self.region_files)
         self.region_list                   = self.original_region_list
@@ -66,7 +67,7 @@ class World:
         region_list = []
 
         for region in region_files :
-            region_list.append(filename_to_coords(region))
+            region_list.append(self._filename_to_coords(region))
 
         region_list.sort()
 
@@ -96,8 +97,49 @@ class World:
         self.region_bounds.adjust_boundary(new_origin)
         self.region_list = new_region_list
 
+    def choose_new_location(self, world_list) :
+        collision = True ## Just needed to start the loop (why no do-while in python?!)
+        while (collision):
+            collision = False
 
-    def print_world(self) : ## TODO
+            ## Each subsequent world is farther out
+            distance = MOVE_DISTANCE + (len(world_list) - 1) * MOVE_STEP
+
+            distance = random.randint(MOVE_DISTANCE - MOVE_VARIANCE, MOVE_DISTANCE + MOVE_VARIANCE)
+            direction = random.uniform(0, 2 * math.pi) ## radians
+
+            ## I found a use for trig in the real world! My maths teachers should be proud
+            new_origin = (int(distance * math.sin(direction)), int(distance * math.cos(direction)))
+            self.move_origin(new_origin)
+
+            print(new_origin)
+
+            ## TODO: Redo collision checking
+
+            # ## Check wether any of the edges of the new world are within the bounds of an existing world
+            # for world in world_list:
+            #     ## Check if x direction overlap
+            #     if  ( ## It overlaps in the x direction and in the z direction
+            #             world["region_bounds"]["min_x"] <= new_region_bounds["min_x"] <= world["region_bounds"]["max_x"] \
+            #             or \
+            #             world["region_bounds"]["min_x"] <= new_region_bounds["max_x"] <= world["region_bounds"]["max_x"] \
+            #         ) \
+            #         and \
+            #         ( \
+            #             world["region_bounds"]["min_z"] <= new_region_bounds["min_z"] <= world["region_bounds"]["max_z"] \
+            #             or \
+            #             world["region_bounds"]["min_z"] <= new_region_bounds["max_z"] <= world["region_bounds"]["max_z"] \
+            #         ) :
+            #         collision = True
+            #         break
+            #     else :
+            #         ## Miss in at least one direction so world ok
+            #         continue
+        
+        self.move_origin(new_origin)
+
+
+    def print_world(self, world_id) : ## TODO
         ## The +1 is because the region bounds are inclusive bounds
         size_x = self.region_bounds.max_x - self.region_bounds.min_x + 1
         size_z = self.region_bounds.max_z - self.region_bounds.min_z + 1
@@ -112,60 +154,86 @@ class World:
             matrix_x = region[0] - self.region_bounds.min_x
             matrix_z = region[1] - self.region_bounds.min_z
 
-            region_matrix[matrix_z][matrix_x] = str(id)
+            region_matrix[matrix_z][matrix_x] = str(world_id)
 
         for line in region_matrix :
             print('|' + ''.join(line) + '|')
     
-    
+
+class WorldList(Sequence) :
+    def __init__(self) :
+        self.world_list = []
+        self.world_set = set()
+
+    def __getitem__(self, i):
+        return self.world_list[i]
+
+    def __len__(self):
+        return len(self.world_list)
+
+    def append(self, world: World) :
+        self.world_list.append(world)
+        self.world_set.update(world.region_list)
+
+    def get_region_set(self) :
+        return self.world_set
+
+    def print_final_world(self) :
+        world_boundary = WorldBoundary(list(self.world_set))
+
+        size_x = world_boundary.max_x - world_boundary.min_x + 1
+        size_z = world_boundary.max_z - world_boundary.min_z + 1
+
+        region_matrix = [
+            [
+                "." for x in range(size_x)
+            ] for z in range(size_z)
+        ]
+
+        for i in range(len(self)):
+            for region in self[i].region_list :
+                matrix_x = region[0] - world_boundary.min_x
+                matrix_z = region[1] - world_boundary.min_z
+
+                region_matrix[matrix_z][matrix_x] = str(i)
+
+
+        for line in region_matrix :
+            print('|' + ''.join(line) + '|')
+
+
 
     
 ## Now back to normal script whatevers
 def main() :
     print_intro()
 
-    world_list = []
+    world_list = WorldList()
+    world = get_world_from_user(len(world_list))
 
-    world_id = 0
-    path = get_world_from_user(world_id)
-    dest_path = path
+    while world is not None:
+        world.print_world(len(world_list))
 
-    while path != "":
-        
-        region_files = get_region_files(path)
-        region_list = get_region_coords(region_files)
-
-        region_bounds = find_region_bounds(region_list)
-        draw_map_of_regions(region_list, region_bounds, world_id)
-
-        if world_id == 0 :
-            new_origin = (0,0) ## No movement for new world
-        else :
-            new_origin = choose_new_location(region_bounds, world_list)
-            new_origin_coords = (new_origin[0]*512, new_origin[1]*512)
-
-            print("The new centre for world {} will be region {}, which is around coords {}".format(world_id, new_origin, new_origin_coords))
-
-            region_bounds = get_new_region_bounds(new_origin, region_bounds)
+        if len(world_list) != 0 : ## First world is destination world and shouldn't be moved
+            world.choose_new_location(world_list)
+            print(
+                "The new centre for world {} will be region {}, which is around coords {}".format(
+                    len(world_list), 
+                    world.new_origin, 
+                    world.get_origin_coords()
+                )
+            )
 
 
-        world_list.append({
-            "path": path,
-            "region_files": region_files,
-            "region_list": region_list,
-            "region_bounds": region_bounds,
-            "new_origin": new_origin
-        })
+        world_list.append(world)
+        world = get_world_from_user(len(world_list))
 
-        world_id += 1
-        path = get_world_from_user(world_id)
-
+    
     print("""
-===============
-   Final Map
-===============
+Final Map
+---------
     """)
-    draw_final_map(world_list)
+    world_list.print_final_world()
 
     print()
     confirmation = input("Are you happy with this map? Type 'yes' to apply: ")
@@ -182,164 +250,13 @@ def main() :
     # )
 
 
-def get_world_from_user(world_id) :
+def get_world_from_user(world_id) -> World :
     if (world_id == 0) :
-        save_path = input("What's the path to your new world? ")
+        path = input("What's the path to your new world? ")
     else: 
-        save_path = input("\nWhat's the path to old world {}? (leave blank when done) ".format(world_id))
+        path = input("\nWhat's the path to old world {}? (leave blank when done) ".format(world_id))
 
-    return save_path.strip()
-
-
-def filename_to_coords(filename) : 
-    name_parts = filename.split(".")
-    return (int(name_parts[1]), int(name_parts[2]))
-
-
-def get_region_files(path) :
-    region_files_all = os.listdir(path + OVERWORLD_REGION)
-    region_files = []
-    
-    for region in region_files_all :
-        if re.match(r"^r\.-?\d+\.-?\d+\.mc[ra]$", region):
-            region_files.append(region)
-
-    return region_files
-
-
-def get_region_coords(region_files) :
-    region_list = []
-
-    for region in region_files :
-        region_list.append(filename_to_coords(region))
-
-    region_list.sort()
-
-    return region_list
-
-
-def find_region_bounds(region_list) :
-    x_coords = [region[0] for region in region_list]
-    z_coords = [region[1] for region in region_list]
-
-    z_coords.sort()
-
-    return {
-        'min_x': x_coords[0],
-        'max_x': x_coords[-1],
-        'min_z': z_coords[0],
-        'max_z': z_coords[-1],
-    }
-
-def get_new_region_bounds(new_origin, region_bounds) :
-    return {
-        'min_x': region_bounds["min_x"] + new_origin[0],
-        'max_x': region_bounds["max_x"] + new_origin[0],
-        'min_z': region_bounds["min_z"] + new_origin[1],
-        'max_z': region_bounds["max_z"] + new_origin[1],
-    }
-
-def draw_map_of_regions(region_list, region_bounds, id) :
-    size_x = region_bounds["max_x"] - region_bounds["min_x"] + 1
-    size_z = region_bounds["max_z"] - region_bounds["min_z"] + 1
-
-    region_matrix = [
-        [
-            "." for x in range(size_x)
-        ] for z in range(size_z)
-    ]
-
-    for region in region_list :
-        matrix_x = region[0] - region_bounds["min_x"]
-        matrix_z = region[1] - region_bounds["min_z"]
-
-        region_matrix[matrix_z][matrix_x] = str(id)
-
-    for line in region_matrix :
-        print('|' + ''.join(line) + '|')
-    
-    
-
-def choose_new_location(region_bounds, world_list) :
-    collision = True ## Just needed to start the loop (why no do-while in python?!)
-    while (collision):
-        collision = False
-
-        ## Each subsequent world is farther out
-        distance = MOVE_DISTANCE + (len(world_list) - 1) * MOVE_STEP
-
-        distance = random.randint(MOVE_DISTANCE - MOVE_VARIANCE, MOVE_DISTANCE + MOVE_VARIANCE)
-        direction = random.uniform(0, 2 * math.pi) ## radians
-
-        ## I found a use for trig in the real world! My maths teachers should be proud
-        new_origin = (int(distance * math.sin(direction)), int(distance * math.cos(direction)))
-        new_region_bounds = get_new_region_bounds(new_origin, region_bounds)
-
-        # new_region_list = [
-        #     for z in 
-        # ]
-
-        print(new_origin)
-
-        # ## Check wether any of the edges of the new world are within the bounds of an existing world
-        # for world in world_list:
-        #     ## Check if x direction overlap
-        #     if  ( ## It overlaps in the x direction and in the z direction
-        #             world["region_bounds"]["min_x"] <= new_region_bounds["min_x"] <= world["region_bounds"]["max_x"] \
-        #             or \
-        #             world["region_bounds"]["min_x"] <= new_region_bounds["max_x"] <= world["region_bounds"]["max_x"] \
-        #         ) \
-        #         and \
-        #         ( \
-        #             world["region_bounds"]["min_z"] <= new_region_bounds["min_z"] <= world["region_bounds"]["max_z"] \
-        #             or \
-        #             world["region_bounds"]["min_z"] <= new_region_bounds["max_z"] <= world["region_bounds"]["max_z"] \
-        #         ) :
-        #         collision = True
-        #         break
-        #     else :
-        #         ## Miss in at least one direction so world ok
-        #         continue
-    
-    return new_origin
-
-def draw_final_map(world_list) :
-    ## Gather all worlds into one list and make a matrix of that list
-    all_regions = []
-
-    for i in range(len(world_list)) :
-        for region in world_list[i]["region_list"] :
-            ## TODO: Change this
-            all_regions.append(
-                (
-                    region[0] + world_list[i]["new_origin"][0], 
-                    region[1] + world_list[i]["new_origin"][1], 
-                    i
-                )
-            )
-
-    all_regions.sort()
-
-    region_bounds = find_region_bounds(all_regions)
-
-    size_x = region_bounds["max_x"] - region_bounds["min_x"] + 1
-    size_z = region_bounds["max_z"] - region_bounds["min_z"] + 1
-
-    region_matrix = [
-        [
-            "." for x in range(size_x)
-        ] for z in range(size_z)
-    ]
-
-    for region in all_regions :
-        matrix_x = region[0] - region_bounds["min_x"]
-        matrix_z = region[1] - region_bounds["min_z"]
-
-        region_matrix[matrix_z][matrix_x] = str(region[2])
-
-    for line in region_matrix :
-        print('|' + ''.join(line) + '|')
-
+    return None if path.strip() == "" else World(path)
 
 
 
@@ -359,11 +276,11 @@ def move_region_files(new_origin, region_files, src_folder, dest_folder):
 
 def print_intro() :
     print('''
-=============================
-  Minecraft Map-in-Map Tool
+========================================================================
+                       Minecraft Map-in-Map Tool
 
-     Created by Maddie_J
-=============================
+                          Created by Maddie_J
+========================================================================
 
 Welcome to my little map-in-map tool! This script lets you hide Minecraft 
 worlds within other ones, allowing for organic storytelling as the players
