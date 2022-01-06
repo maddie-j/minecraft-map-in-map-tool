@@ -10,8 +10,13 @@ MOVE_DISTANCE = 30
 MOVE_VARIANCE = 5
 MOVE_STEP = 5
 
-OVERWORLD_REGION = "\\region"
-POI_REGION = "\\poi"
+OVERWORLD_REGION = "region"
+POI_REGION = "poi"
+ENTITIES_REGION = "entities"
+
+def filename_to_coords(filename) : 
+    name_parts = filename.split(".")
+    return (int(name_parts[1]), int(name_parts[2]))
 
 
 ## I caved and decided to orient some objects
@@ -49,12 +54,10 @@ class World:
         self.region_bounds: WorldBoundary  = WorldBoundary(self.region_list)
         self.new_origin: tuple             = (0, 0)
 
-    def _filename_to_coords(self, filename) : 
-        name_parts = filename.split(".")
-        return (int(name_parts[1]), int(name_parts[2]))
+
 
     def _get_region_files(self, path) :
-        region_files_all = os.listdir(path + OVERWORLD_REGION)
+        region_files_all = os.listdir(os.path.join(path, OVERWORLD_REGION))
         region_files = []
         
         for region in region_files_all :
@@ -67,7 +70,7 @@ class World:
         region_list = []
 
         for region in region_files :
-            region_list.append(self._filename_to_coords(region))
+            region_list.append(filename_to_coords(region))
 
         region_list.sort()
 
@@ -181,6 +184,41 @@ class WorldList(Sequence) :
         for line in region_matrix :
             print('|' + ''.join(line) + '|')
 
+    def move_region_files(self):
+        this_is_first_world = True
+        for world in self:
+            if this_is_first_world:
+                this_is_first_world = False
+                continue
+
+            move_poi = os.path.exists(os.path.join(world.path, POI_REGION))
+            move_entities = os.path.exists(os.path.join(world.path, ENTITIES_REGION))
+
+            for filename in world.region_files:
+                old_coords = filename_to_coords(filename)
+                new_coords = (old_coords[0] + world.new_origin[0], old_coords[1] + world.new_origin[1])
+                
+                new_filename = 'r.{}.{}.mca'.format(new_coords[0], new_coords[1])
+
+                old_filepath = os.path.join(world.path, OVERWORLD_REGION, filename)
+                new_filepath = os.path.join(self[0].path, OVERWORLD_REGION, new_filename)
+                shutil.copyfile(old_filepath, new_filepath)
+
+                if move_poi:
+                    try:
+                        old_filepath = os.path.join(world.path, POI_REGION, filename)
+                        new_filepath = os.path.join(self[0].path, POI_REGION, new_filename)
+                        shutil.copyfile(old_filepath, new_filepath)
+                    except:
+                        pass
+
+                if move_entities:
+                    try:
+                        old_filepath = os.path.join(world.path, ENTITIES_REGION, filename)
+                        new_filepath = os.path.join(self[0].path, ENTITIES_REGION, new_filename)
+                        shutil.copyfile(old_filepath, new_filepath)
+                    except:
+                        pass
 
 
     
@@ -219,15 +257,16 @@ Final Map
     confirmation = input("Are you happy with this map? Type 'yes' to apply: ")
 
     if confirmation.strip().lower() == "yes" :
-        ## TODO: Move region files
-        pass
+        print("Copying files. This may take a few mins...")
+        world_list.move_region_files()
+        print("""
+Done!
 
-        # move_region_files(
-        #     new_origin, 
-        #     region_files, 
-        #     path + OVERWORLD_REGION, 
-        #     DEST_SAVE + OVERWORLD_REGION
-        # )
+Feel free to open your world in Minecraft and start exploring! You
+can use the output above to help navigate to your hidden worlds.
+Or leave it a surprise! It's all in your hands now.
+""")
+
 
 
 def get_world_from_user(world_id) -> World :
@@ -237,7 +276,6 @@ def get_world_from_user(world_id) -> World :
         path = input("\nWhat's the path to old world {}? (leave blank when done) ".format(world_id))
 
     return None if path.strip() == "" else World(path)
-
 
 
 def move_region_files(new_origin, region_files, src_folder, dest_folder):
