@@ -18,7 +18,7 @@ people running it will be using Windows machines. However, it should theoretical
 usable on both Linux and Mac too. 
 
 Instructions on how the script works are printed out when you run the script, so I won't
-repeat them here. But the TL;DR is that it will as for the input paths of the save files
+repeat them here. But the TL;DR is that it will ask for the input paths of the save files
 of the relevant Minecraft worlds, first the world that will house the other worlds
 followed by the other worlds that are to be hidden within the first. The script will
 then randomly fit the worlds together, giving you a visualisation of what it's found
@@ -45,4 +45,5 @@ if your worlds are of a different size. You'll most likely want a much shorter
 
 Also, can 10/10 recommend pruning your world saves before merging, both to save on the 
 overall save size but also so there are fewer regions that could get in the way of other 
-regions that we're trying to merge together.
+regions that we're trying to merge together. ~~Don't be like HC S4 oh gosh I have no 
+idea how that world download could be that messy 😂~~
